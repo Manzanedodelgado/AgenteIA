@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rubio García Dental - Asistente IA</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to right, #3949AB 0%, #42A5F5 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 550px;
+            padding: 40px 35px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .logo img {
+            max-width: 280px;
+            height: auto;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 15px;
+            margin-bottom: 30px;
+        }
+
+        .chat-area {
+            background: #F5F5F5;
+            border-radius: 15px;
+            padding: 25px 20px;
+            margin-bottom: 25px;
+            min-height: 280px;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        .welcome {
+            text-align: center;
+            color: #666;
+            line-height: 1.6;
+            padding: 60px 20px;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 10px 16px;
+            border-radius: 16px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #3949AB, #42A5F5);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .input-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 55px 14px 18px;
+            border: 2px solid #3949AB;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #1E88E5;
+        }
+
+        input[type="text"]::placeholder {
+            color: #999;
+        }
+
+        .voice-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            padding: 0;
+            transition: transform 0.2s;
+        }
+
+        .voice-btn:hover {
+            transform: translateY(-50%) scale(1.08);
+        }
+
+        .voice-btn.active {
+            animation: pulseVoz 1.5s infinite;
+        }
+
+        @keyframes pulseVoz {
+            0%, 100% {
+                filter: drop-shadow(0 0 8px rgba(195, 229, 56, 0.7));
+            }
+            50% {
+                filter: drop-shadow(0 0 16px rgba(195, 229, 56, 1));
+            }
+        }
+
+        .voice-btn img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .send-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(to right, #3949AB, #42A5F5);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(57, 73, 171, 0.3);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 10px 16px;
+            background: white;
+            border-radius: 16px;
+            width: fit-content;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .typing-indicator.show {
+            display: block;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #3949AB;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 25px;
+            }
+
+            .logo img {
+                max-width: 240px;
+            }
+
+            .chat-area {
+                min-height: 240px;
+            }
+
+            input[type="text"] {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="/static/logo.png" alt="Rubio García Dental">
+        </div>
+
+        <p class="subtitle">Asistente IA</p>
+
+        <div class="chat-area" id="chatArea">
+            <div class="welcome">
+                👋 Hola, soy tu asistente inteligente.<br>
+                Escribe o usa el botón de voz.
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="userInput" 
+                placeholder="Escribe aquí o pulsa el botón de voz..."
+                onkeypress="if(event.key==='Enter') enviar()"
+            >
+            <button class="voice-btn" id="voiceBtn" onclick="toggleVoz()">
+                <img src="/static/avatar.png" alt="Voz">
+            </button>
+        </div>
+
+        <button class="send-btn" id="sendBtn" onclick="enviar()">ENVIAR</button>
+    </div>
+
+    <script>
+        let reconocimiento = null;
+        let escuchando = false;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            reconocimiento = new SpeechRecognition();
+            reconocimiento.lang = 'es-ES';
+            reconocimiento.continuous = false;
+
+            reconocimiento.onresult = (event) => {
+                const texto = event.results[0][0].transcript;
+                document.getElementById('userInput').value = texto;
+                enviar();
+            };
+
+            reconocimiento.onend = () => {
+                escuchando = false;
+                document.getElementById('voiceBtn').classList.remove('active');
+            };
+
+            reconocimiento.onerror = () => {
+                escuchando = false;
+                document.getElementById('voiceBtn').classList.remove('active');
+            };
+        }
+
+        function toggleVoz() {
+            if (!reconocimiento) {
+                alert('Tu navegador no soporta reconocimiento de voz');
+                return;
+            }
+
+            if (escuchando) {
+                reconocimiento.stop();
+            } else {
+                reconocimiento.start();
+                escuchando = true;
+                document.getElementById('voiceBtn').classList.add('active');
+            }
+        }
+
+        async function enviar() {
+            const input = document.getElementById('userInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const texto = input.value.trim();
+
+            if (!texto) return;
+
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.remove();
+
+            agregarMensaje(texto, 'user');
+            input.value = '';
+            sendBtn.disabled = true;
+
+            mostrarEscribiendo(true);
+
+            try {
+                const response = await fetch('/api/comando', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comando: texto })
+                });
+
+                const data = await response.json();
+                mostrarEscribiendo(false);
+
+                if (data.success) {
+                    if (data.pacientes) {
+                        let msg = `Encontré ${data.pacientes.length} paciente(s):\n\n`;
+                        data.pacientes.forEach(p => {
+                            msg += `• ${p.Nombre} ${p.Apellidos} (#${p.NumPac})\n  Tel: ${p.TelMovil || 'N/A'}\n\n`;
+                        });
+                        agregarMensaje(msg, 'assistant');
+                    } else if (data.citas) {
+                        let msg = `Citas del ${data.fecha}:\n\n`;
+                        data.citas.forEach(c => {
+                            msg += `• ${c.Hora} - ${c.Paciente}\n`;
+                        });
+                        agregarMensaje(msg, 'assistant');
+                    } else if (data.colaboradores) {
+                        let msg = 'Colaboradores:\n\n';
+                        data.colaboradores.forEach(c => {
+                            msg += `• ${c.Nombre} ${c.Apellidos}\n`;
+                        });
+                        agregarMensaje(msg, 'assistant');
+                    } else {
+                        // Manejar cualquier otro tipo de respuesta
+                        const mensaje = data.mensaje || data.error || 'Comando procesado';
+                        agregarMensaje(String(mensaje), 'assistant');
+                    }
+                } else {
+                    const errorMsg = data.mensaje || data.error || 'Error desconocido';
+                    agregarMensaje('❌ ' + String(errorMsg), 'assistant');
+                }
+            } catch (error) {
+                mostrarEscribiendo(false);
+                agregarMensaje('❌ Error de conexión', 'assistant');
+            }
+
+            sendBtn.disabled = false;
+            input.focus();
+        }
+
+        function agregarMensaje(texto, tipo) {
+            const chat = document.getElementById('chatArea');
+            const div = document.createElement('div');
+            div.className = `message ${tipo}`;
+            // Asegurar que texto es string
+            const textoSeguro = String(texto || '');
+            div.innerHTML = `<div class="message-bubble">${textoSeguro.replace(/\n/g, '<br>')}</div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function mostrarEscribiendo(mostrar) {
+            let indicator = document.getElementById('typingIndicator');
+
+            if (mostrar && !indicator) {
+                const chat = document.getElementById('chatArea');
+                const div = document.createElement('div');
+                div.className = 'message assistant';
+                div.id = 'typingIndicator';
+                div.innerHTML = `
+                    <div class="typing-indicator show">
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                `;
+                chat.appendChild(div);
+                chat.scrollTop = chat.scrollHeight;
+            } else if (!mostrar && indicator) {
+                indicator.remove();
+            }
+        }
+
+        document.getElementById('userInput').focus();
+    </script>
+</body>
+</html>
