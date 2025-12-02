@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rubio García Dental - Asistente IA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rubio García · Asistente IA</title>
     <style>
         * {
             margin: 0;
@@ -12,318 +13,427 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(to right, #3949AB 0%, #42A5F5 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(180deg, #1a2d5a 0%, #2E4C9E 100%);
             min-height: 100vh;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            flex-direction: column;
+            color: #fff;
+            overflow-x: hidden;
         }
 
-        .container {
-            background: white;
-            border-radius: 25px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 550px;
-            padding: 40px 35px;
-        }
-
-        .logo {
+        /* Header minimalista */
+        .header {
+            padding: 20px 24px;
             text-align: center;
-            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .logo img {
-            max-width: 280px;
-            height: auto;
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            color: #fff;
         }
 
-        .subtitle {
-            text-align: center;
-            color: #999;
-            font-size: 15px;
-            margin-bottom: 30px;
+        .header p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 4px;
         }
 
-        .chat-area {
-            background: #F5F5F5;
-            border-radius: 15px;
-            padding: 25px 20px;
-            margin-bottom: 25px;
-            min-height: 280px;
-            max-height: 380px;
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
             overflow-y: auto;
+            padding: 20px 16px 100px;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .welcome {
-            text-align: center;
-            color: #666;
-            line-height: 1.6;
-            padding: 60px 20px;
+        .chat-container::-webkit-scrollbar {
+            width: 0;
+            display: none;
         }
 
+        /* Mensaje */
         .message {
-            margin-bottom: 12px;
             display: flex;
-            gap: 8px;
-            animation: fadeIn 0.3s;
+            margin-bottom: 16px;
+            animation: slideUp 0.3s ease;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .message.user {
-            flex-direction: row-reverse;
+            justify-content: flex-end;
         }
 
         .message-bubble {
             max-width: 75%;
-            padding: 10px 16px;
-            border-radius: 16px;
+            padding: 12px 16px;
+            border-radius: 20px;
+            font-size: 15px;
             line-height: 1.5;
-            font-size: 14px;
+            word-wrap: break-word;
         }
 
         .message.user .message-bubble {
-            background: linear-gradient(135deg, #3949AB, #42A5F5);
-            color: white;
-            border-bottom-right-radius: 4px;
+            background: linear-gradient(135deg, #2E4C9E 0%, #3e60c8 100%);
+            color: #fff;
+            border-bottom-right-radius: 6px;
         }
 
         .message.assistant .message-bubble {
-            background: white;
-            color: #333;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-bottom-left-radius: 6px;
+            backdrop-filter: blur(10px);
         }
 
-        .input-container {
-            position: relative;
-            margin-bottom: 15px;
+        /* Estado de escritura */
+        .typing {
+            display: flex;
+            gap: 6px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+            width: fit-content;
         }
 
-        input[type="text"] {
-            width: 100%;
-            padding: 14px 55px 14px 18px;
-            border: 2px solid #3949AB;
-            border-radius: 25px;
-            font-size: 14px;
+        .typing span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            animation: bounce 1.4s infinite;
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+            }
+
+            30% {
+                transform: translateY(-6px);
+            }
+        }
+
+        /* Input Area - Fijo abajo */
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .input-field {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 15px;
             outline: none;
-            transition: border-color 0.3s;
+            transition: all 0.2s;
         }
 
-        input[type="text"]:focus {
-            border-color: #1E88E5;
+        .input-field::placeholder {
+            color: rgba(255, 255, 255, 0.4);
         }
 
-        input[type="text"]::placeholder {
-            color: #999;
+        .input-field:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(102, 126, 234, 0.5);
         }
 
         .voice-btn {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 40px;
-            height: 40px;
-            border: none;
-            background: transparent;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            padding: 0;
-            transition: transform 0.2s;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
 
-        .voice-btn:hover {
-            transform: translateY(-50%) scale(1.08);
+        .voice-btn:active {
+            transform: scale(0.95);
         }
 
-        .voice-btn.active {
-            animation: pulseVoz 1.5s infinite;
+        .voice-btn.listening {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            animation: pulse 1.5s infinite;
         }
 
-        @keyframes pulseVoz {
-            0%, 100% {
-                filter: drop-shadow(0 0 8px rgba(195, 229, 56, 0.7));
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
             }
+
             50% {
-                filter: drop-shadow(0 0 16px rgba(195, 229, 56, 1));
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
             }
-        }
-
-        .voice-btn img {
-            width: 100%;
-            height: 100%;
         }
 
         .send-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(to right, #3949AB, #42A5F5);
-            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #C3E538 0%, #a8c930 100%);
             border: none;
-            border-radius: 25px;
-            font-size: 15px;
-            font-weight: 600;
+            color: #2E4C9E;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
 
-        .send-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(57, 73, 171, 0.3);
+        .send-btn:active {
+            transform: scale(0.95);
         }
 
         .send-btn:disabled {
-            opacity: 0.6;
+            opacity: 0.4;
             cursor: not-allowed;
-            transform: none;
         }
 
-        .typing-indicator {
-            display: none;
-            padding: 10px 16px;
-            background: white;
-            border-radius: 16px;
-            width: fit-content;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .typing-indicator.show {
-            display: block;
-        }
-
-        .typing-dots {
+        /* Welcome Screen */
+        .welcome {
             display: flex;
-            gap: 4px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 20px;
+            min-height: 60vh;
         }
 
-        .typing-dot {
-            width: 7px;
-            height: 7px;
+        .welcome-icon {
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
-            background: #3949AB;
-            animation: typing 1.4s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 8px 24px rgba(195, 229, 56, 0.3);
         }
 
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-        @keyframes typing {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-6px); }
+        .welcome-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 30px 25px;
-            }
+        .welcome h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
 
-            .logo img {
-                max-width: 240px;
-            }
+        .welcome p {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.5;
+        }
 
-            .chat-area {
-                min-height: 240px;
-            }
+        /* Sugerencias rápidas */
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
 
-            input[type="text"] {
-                font-size: 16px;
-            }
+        .suggestions::-webkit-scrollbar {
+            display: none;
+        }
+
+        .suggestion-chip {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: #fff;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-chip:active {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(0.98);
         }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <div class="logo">
-            <img src="/static/logo.png" alt="Rubio García Dental">
-        </div>
+    <div class="header">
+        <img src="/static/logo.png" alt="Rubio García Dental" style="max-width: 90%; height: auto; max-height: 60px;">
+        <p>Asistente IA</p>
+    </div>
 
-        <p class="subtitle">Asistente IA</p>
-
-        <div class="chat-area" id="chatArea">
-            <div class="welcome">
-                👋 Hola, soy tu asistente inteligente.<br>
-                Escribe o usa el botón de voz.
+    <div class="chat-container" id="chatContainer">
+        <div class="welcome" id="welcome">
+            <div class="welcome-icon">
+                <img src="/static/avatar.png" alt="Avatar">
             </div>
+            <h2>¡Hola! Soy tu asistente</h2>
+            <p>Puedo ayudarte con pacientes,<br>citas y gestiones de la clínica</p>
         </div>
+    </div>
 
-        <div class="input-container">
-            <input 
-                type="text" 
-                id="userInput" 
-                placeholder="Escribe aquí o pulsa el botón de voz..."
-                onkeypress="if(event.key==='Enter') enviar()"
-            >
-            <button class="voice-btn" id="voiceBtn" onclick="toggleVoz()">
-                <img src="/static/avatar.png" alt="Voz">
-            </button>
+    <div class="suggestions" id="suggestions">
+        <div class="suggestion-chip" onclick="enviarSugerencia('Busca al paciente Juan García')">🔍 Buscar paciente
         </div>
+        <div class="suggestion-chip" onclick="enviarSugerencia('¿Qué citas hay hoy?')">📅 Citas de hoy</div>
+        <div class="suggestion-chip" onclick="enviarSugerencia('¿Qué citas hay mañana?')">🗓️ Citas de mañana</div>
+    </div>
 
-        <button class="send-btn" id="sendBtn" onclick="enviar()">ENVIAR</button>
+    <div class="input-area">
+        <div class="input-wrapper">
+            <input type="text" class="input-field" id="userInput" placeholder="Escribe tu mensaje..."
+                onkeypress="if(event.key==='Enter') enviar()" autocomplete="off">
+            <button class="voice-btn" id="voiceBtn" onclick="toggleVoz()">🎤</button>
+            <button class="send-btn" id="sendBtn" onclick="enviar()">➤</button>
+        </div>
     </div>
 
     <script>
-        let reconocimiento = null;
-        let escuchando = false;
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const welcome = document.getElementById('welcome');
+        const suggestions = document.getElementById('suggestions');
+
+        // Reconocimiento de voz
+        let recognition = null;
+        let isListening = false;
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            reconocimiento = new SpeechRecognition();
-            reconocimiento.lang = 'es-ES';
-            reconocimiento.continuous = false;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'es-ES';
+            recognition.continuous = false;
+            recognition.interimResults = false;
 
-            reconocimiento.onresult = (event) => {
+            recognition.onstart = () => {
+                isListening = true;
+                voiceBtn.classList.add('listening');
+            };
+
+            recognition.onresult = (event) => {
                 const texto = event.results[0][0].transcript;
-                document.getElementById('userInput').value = texto;
+                userInput.value = texto;
                 enviar();
             };
 
-            reconocimiento.onend = () => {
-                escuchando = false;
-                document.getElementById('voiceBtn').classList.remove('active');
+            recognition.onend = () => {
+                isListening = false;
+                voiceBtn.classList.remove('listening');
             };
 
-            reconocimiento.onerror = () => {
-                escuchando = false;
-                document.getElementById('voiceBtn').classList.remove('active');
+            recognition.onerror = (event) => {
+                isListening = false;
+                voiceBtn.classList.remove('listening');
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    agregarMensaje('❌ Error de reconocimiento de voz', 'assistant');
+                }
             };
+        } else {
+            voiceBtn.style.display = 'none'; // Ocultar si no hay soporte
         }
 
         function toggleVoz() {
-            if (!reconocimiento) {
-                alert('Tu navegador no soporta reconocimiento de voz');
+            if (!recognition) {
+                agregarMensaje('❌ Tu navegador no soporta reconocimiento de voz', 'assistant');
                 return;
             }
 
-            if (escuchando) {
-                reconocimiento.stop();
+            if (isListening) {
+                recognition.stop();
             } else {
-                reconocimiento.start();
-                escuchando = true;
-                document.getElementById('voiceBtn').classList.add('active');
+                recognition.start();
             }
         }
 
-        async function enviar() {
-            const input = document.getElementById('userInput');
-            const sendBtn = document.getElementById('sendBtn');
-            const texto = input.value.trim();
+        function enviarSugerencia(texto) {
+            userInput.value = texto;
+            enviar();
+        }
 
+        async function enviar() {
+            const texto = userInput.value.trim();
             if (!texto) return;
 
-            const welcome = document.querySelector('.welcome');
-            if (welcome) welcome.remove();
+            // Ocultar welcome y sugerencias
+            if (welcome) {
+                welcome.style.display = 'none';
+                suggestions.style.display = 'none';
+            }
 
+            // Agregar mensaje del usuario
             agregarMensaje(texto, 'user');
-            input.value = '';
+            userInput.value = '';
             sendBtn.disabled = true;
 
-            mostrarEscribiendo(true);
+            // Mostrar typing
+            const typingId = mostrarTyping();
 
             try {
                 const response = await fetch('/api/comando', {
@@ -333,81 +443,47 @@
                 });
 
                 const data = await response.json();
-                mostrarEscribiendo(false);
 
-                if (data.success) {
-                    if (data.pacientes) {
-                        let msg = `Encontré ${data.pacientes.length} paciente(s):\n\n`;
-                        data.pacientes.forEach(p => {
-                            msg += `• ${p.Nombre} ${p.Apellidos} (#${p.NumPac})\n  Tel: ${p.TelMovil || 'N/A'}\n\n`;
-                        });
-                        agregarMensaje(msg, 'assistant');
-                    } else if (data.citas) {
-                        let msg = `Citas del ${data.fecha}:\n\n`;
-                        data.citas.forEach(c => {
-                            msg += `• ${c.Hora} - ${c.Paciente}\n`;
-                        });
-                        agregarMensaje(msg, 'assistant');
-                    } else if (data.colaboradores) {
-                        let msg = 'Colaboradores:\n\n';
-                        data.colaboradores.forEach(c => {
-                            msg += `• ${c.Nombre} ${c.Apellidos}\n`;
-                        });
-                        agregarMensaje(msg, 'assistant');
-                    } else {
-                        // Manejar cualquier otro tipo de respuesta
-                        const mensaje = data.mensaje || data.error || 'Comando procesado';
-                        agregarMensaje(String(mensaje), 'assistant');
-                    }
+                // Remover typing
+                document.getElementById(typingId)?.remove();
+
+                // Mostrar respuesta
+                if (data.success && data.mensaje) {
+                    agregarMensaje(data.mensaje, 'assistant');
                 } else {
-                    const errorMsg = data.mensaje || data.error || 'Error desconocido';
-                    agregarMensaje('❌ ' + String(errorMsg), 'assistant');
+                    agregarMensaje(data.error || '❌ Error al procesar', 'assistant');
                 }
             } catch (error) {
-                mostrarEscribiendo(false);
+                document.getElementById(typingId)?.remove();
                 agregarMensaje('❌ Error de conexión', 'assistant');
             }
 
             sendBtn.disabled = false;
-            input.focus();
+            userInput.focus();
         }
 
         function agregarMensaje(texto, tipo) {
-            const chat = document.getElementById('chatArea');
             const div = document.createElement('div');
             div.className = `message ${tipo}`;
-            // Asegurar que texto es string
-            const textoSeguro = String(texto || '');
-            div.innerHTML = `<div class="message-bubble">${textoSeguro.replace(/\n/g, '<br>')}</div>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
+            div.innerHTML = `<div class="message-bubble">${texto.replace(/\n/g, '<br>')}</div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        function mostrarEscribiendo(mostrar) {
-            let indicator = document.getElementById('typingIndicator');
-
-            if (mostrar && !indicator) {
-                const chat = document.getElementById('chatArea');
-                const div = document.createElement('div');
-                div.className = 'message assistant';
-                div.id = 'typingIndicator';
-                div.innerHTML = `
-                    <div class="typing-indicator show">
-                        <div class="typing-dots">
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                        </div>
-                    </div>
-                `;
-                chat.appendChild(div);
-                chat.scrollTop = chat.scrollHeight;
-            } else if (!mostrar && indicator) {
-                indicator.remove();
-            }
+        function mostrarTyping() {
+            const id = 'typing-' + Date.now();
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = 'message assistant';
+            div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return id;
         }
 
-        document.getElementById('userInput').focus();
+        // Auto-focus en el input
+        userInput.focus();
     </script>
 </body>
+
 </html>

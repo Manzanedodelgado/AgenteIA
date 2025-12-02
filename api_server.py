@@ -14,12 +14,15 @@ IA: Claude API
 
 from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
-import pyodbc
+import pymssql
 import os
 from datetime import datetime, timedelta
 import logging
 import secrets
-import google.generativeai as genai
+import secrets
+from langchain_ollama import ChatOllama
+from langchain_core.tools import tool
+from langchain_core.messages import HumanMessage, SystemMessage
 
 # =====================================================
 # CONFIGURACIÓN
@@ -28,25 +31,31 @@ import google.generativeai as genai
 class Config:
     """Configuración del servidor"""
     
-    # SQL Server LOCAL
-    SQL_SERVER = "GABINETE2\\INFOMED"
+    # SQL Server REMOTO (Vía Ngrok)
+    SQL_SERVER = "5.tcp.eu.ngrok.io"
+    SQL_PORT = 19317
     SQL_DATABASE = "GELITE"
-    SQL_DRIVER = "SQL Server"
+    SQL_USER = "RUBIOGARCIADENTAL"
+    SQL_PASSWORD = "666666"
+    
     ID_CENTRO = 2
     
-    # Google Gemini API (GRATIS)
-    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    # Ollama Configuration
+    OLLAMA_BASE_URL = "http://localhost:11434"
+    OLLAMA_MODEL = "llama3.2" # Modelo mucho más rápido (3B params)
     
     # Seguridad
     SECRET_KEY = secrets.token_hex(16)
     
     @classmethod
-    def get_connection_string(cls):
-        return (
-            f'DRIVER={{{cls.SQL_DRIVER}}};'
-            f'SERVER={cls.SQL_SERVER};'
-            f'DATABASE={cls.SQL_DATABASE};'
-            f'Trusted_Connection=yes;'
+    def get_db_connection(cls):
+        return pymssql.connect(
+            server=cls.SQL_SERVER,
+            port=cls.SQL_PORT,
+            user=cls.SQL_USER,
+            password=cls.SQL_PASSWORD,
+            database=cls.SQL_DATABASE,
+            as_dict=True
         )
 
 # Configurar logging
@@ -75,22 +84,17 @@ ALLOWED_ORIGINS = [
 ]
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
-# Cliente Gemini
-api_key = Config.GOOGLE_API_KEY
-if api_key:
-    try:
-        genai.configure(api_key=api_key)
-        gemini_model = genai.GenerativeModel(
-            'gemini-2.0-flash-exp',
-            tools='code_execution'
-        )
-        logging.info("✅ Google Gemini configurado correctamente")
-    except Exception as e:
-        gemini_model = None
-        logging.error(f"❌ Error configurando Gemini: {e}")
-else:
-    gemini_model = None
-    logging.error("❌ GOOGLE_API_KEY no está configurada")
+# Cliente Ollama
+try:
+    llm = ChatOllama(
+        model=Config.OLLAMA_MODEL,
+        temperature=0,
+        base_url=Config.OLLAMA_BASE_URL
+    )
+    logging.info(f"✅ Ollama configurado: {Config.OLLAMA_MODEL}")
+except Exception as e:
+    llm = None
+    logging.error(f"❌ Error configurando Ollama: {e}")
 
 # =====================================================
 # UTILIDADES BASE DE DATOS
@@ -103,19 +107,15 @@ class GesdenDB:
     def ejecutar_query(sql, params=None):
         """Ejecuta query SELECT y retorna resultados"""
         try:
-            conn = pyodbc.connect(Config.get_connection_string())
-            cursor = conn.cursor()
+            conn = Config.get_db_connection()
+            cursor = conn.cursor(as_dict=True)
             
             if params:
                 cursor.execute(sql, params)
             else:
                 cursor.execute(sql)
             
-            columns = [column[0] for column in cursor.description]
-            results = []
-            
-            for row in cursor.fetchall():
-                results.append(dict(zip(columns, row)))
+            results = cursor.fetchall()
             
             cursor.close()
             conn.close()
@@ -130,14 +130,15 @@ class GesdenDB:
     def ejecutar_insert(sql, params):
         """Ejecuta INSERT y retorna ID generado"""
         try:
-            conn = pyodbc.connect(Config.get_connection_string())
+            conn = Config.get_db_connection()
             cursor = conn.cursor()
             
             cursor.execute(sql, params)
             conn.commit()
             
-            cursor.execute("SELECT @@IDENTITY")
-            id_generado = cursor.fetchone()[0]
+            cursor.execute("SELECT @@IDENTITY AS id")
+            row = cursor.fetchone()
+            id_generado = row['id'] if row else 0
             
             cursor.close()
             conn.close()
@@ -183,57 +184,120 @@ class GesdenDB:
 # MOTOR IA CON CLAUDE
 # =====================================================
 
+# =====================================================
+# HERRAMIENTAS LANGCHAIN
+# =====================================================
+
+@tool
+def buscar_paciente_db(busqueda: str) -> dict:
+    """Busca pacientes en la base de datos por nombre, apellidos o número de paciente.
+    Args:
+        busqueda: El nombre, apellido o número del paciente a buscar.
+    """
+    return ejecutar_buscar_paciente(busqueda)
+
+@tool
+def listar_citas_db(fecha: str) -> dict:
+    """Lista las citas médicas de una fecha específica.
+    Args:
+        fecha: La fecha a consultar. Puede ser 'hoy', 'mañana' o una fecha en formato 'YYYY-MM-DD'.
+    """
+    return ejecutar_listar_citas(fecha)
+
+@tool
+def crear_cita_db(id_paciente: int, fecha: str, hora: str, motivo: str = "") -> dict:
+    """Crea una nueva cita médica en la agenda.
+    Args:
+        id_paciente: El ID único del paciente (IdPac).
+        fecha: La fecha de la cita en formato 'YYYY-MM-DD'.
+        hora: La hora de la cita en formato 'HH:MM'.
+        motivo: (Opcional) El motivo o descripción de la cita.
+    """
+    return ejecutar_crear_cita(id_paciente, fecha, hora, motivo)
+
+# Lista de herramientas disponibles para el modelo
+tools = [buscar_paciente_db, listar_citas_db, crear_cita_db]
+
+# =====================================================
+# MOTOR IA CON LANGCHAIN + OLLAMA
+# =====================================================
+
 def procesar_con_ia(comando):
-    """Procesa comando con Gemini usando function calling"""
+    """Procesa comando con Ollama usando LangChain y Tools"""
     
-    if not gemini_model:
-        return {"accion": "error", "mensaje": "⚠️ Gemini no configurado"}
+    if not llm:
+        return {"accion": "error", "mensaje": "⚠️ Ollama no configurado"}
     
     try:
-        # Definir funciones para Gemini
-        def buscar_paciente_db(busqueda: str) -> dict:
-            """Busca pacientes por nombre, apellidos o número"""
-            return ejecutar_buscar_paciente(busqueda)
+        # Vincular herramientas al modelo
+        llm_with_tools = llm.bind_tools(tools)
         
-        def listar_citas_db(fecha: str) -> dict:
-            """Lista citas de una fecha (formato: 'hoy', 'mañana', o 'YYYY-MM-DD')"""
-            return ejecutar_listar_citas(fecha)
-        
-        def crear_cita_db(id_paciente: int, fecha: str, hora: str, motivo: str = "") -> dict:
-            """Crea una cita (fecha: YYYY-MM-DD, hora: HH:MM)"""
-            return ejecutar_crear_cita(id_paciente, fecha, hora, motivo)
-        
-        # Crear modelo con funciones
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-exp',
-            tools=[buscar_paciente_db, listar_citas_db, crear_cita_db]
-        )
-        
-        # Iniciar chat
-        chat = model.start_chat(enable_automatic_function_calling=True)
-        
-        # Enviar mensaje
+        # Contexto del sistema
         system_msg = f"""Eres Rubito, asistente virtual de Rubio Garcia Dental.
 Fecha actual: {datetime.now().strftime('%d/%m/%Y %A')}
 
-Cuando el usuario pida crear una cita:
-1. Busca primero al paciente por nombre
-2. Si lo encuentras, crea la cita automáticamente
-3. Calcula las fechas automáticamente ("próximo lunes" = calcula qué fecha es)
-4. Confirma al usuario la cita creada
+Instrucciones:
+1. Eres un asistente útil y amable.
+2. Tienes acceso a la base de datos de la clínica mediante herramientas.
+3. Cuando el usuario pida crear una cita:
+    a. Busca primero al paciente por nombre para obtener su ID.
+    b. Si encuentras al paciente, usa su ID para crear la cita.
+    c. Calcula las fechas automáticamente (ej: "próximo lunes").
+    d. Confirma la acción al usuario.
+4. Si te preguntan algo que requiere datos, USA LAS HERRAMIENTAS.
+"""
 
-SÉ PROACTIVO. NO pidas confirmaciones innecesarias."""
+        # Invocar al modelo
+        messages = [
+            SystemMessage(content=system_msg),
+            HumanMessage(content=comando)
+        ]
         
-        response = chat.send_message(f"{system_msg}\n\nUsuario: {comando}")
+        logging.info(f"📤 Enviando a Ollama: {comando}")
+        response = llm_with_tools.invoke(messages)
+        logging.info(f"📥 Respuesta Ollama (Raw): {response}")
+        
+        # Procesar llamadas a herramientas (Tool Calls)
+        if response.tool_calls:
+            messages.append(response) # Añadir respuesta del asistente con tool_calls
+            
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"].lower()
+                tool_args = tool_call["args"]
+                
+                logging.info(f"🛠️ Ejecutando herramienta: {tool_name} con args: {tool_args}")
+                
+                tool_result = None
+                if tool_name == "buscar_paciente_db":
+                    tool_result = buscar_paciente_db.invoke(tool_args)
+                elif tool_name == "listar_citas_db":
+                    tool_result = listar_citas_db.invoke(tool_args)
+                elif tool_name == "crear_cita_db":
+                    tool_result = crear_cita_db.invoke(tool_args)
+                
+                logging.info(f"✅ Resultado herramienta: {str(tool_result)[:100]}...")
+                
+                # Añadir resultado de la herramienta
+                from langchain_core.messages import ToolMessage
+                messages.append(ToolMessage(tool_call_id=tool_call["id"], content=str(tool_result)))
+            
+            # Invocar de nuevo para obtener respuesta final
+            final_response = llm_with_tools.invoke(messages)
+            logging.info(f"📥 Respuesta Final: {final_response.content}")
+            
+            return {
+                "accion": "respuesta_tool",
+                "mensaje": final_response.content
+            }
         
         return {
             "accion": "respuesta_libre",
-            "mensaje": response.text
+            "mensaje": response.content
         }
     
     except Exception as e:
-        logging.error(f"Error Gemini: {e}")
-        return {"accion": "error", "mensaje": f"Error: {str(e)}"}
+        logging.error(f"Error Ollama: {e}")
+        return {"accion": "error", "mensaje": f"Error procesando con IA: {str(e)}"}
 
 
 # Funciones ejecutoras de herramientas
@@ -247,14 +311,14 @@ def ejecutar_buscar_paciente(busqueda):
             sql = """
                 SELECT TOP 20 IdPac, NumPac, Nombre, Apellidos, TelMovil, Email, FecNacim
                 FROM Pacientes
-                WHERE NumPac = ? AND IdCentro = ?
+                WHERE NumPac = %s AND IdCentro = %s
             """
             params = (int(busqueda), Config.ID_CENTRO)
         else:
             sql = """
                 SELECT TOP 20 IdPac, NumPac, Nombre, Apellidos, TelMovil, Email, FecNacim
                 FROM Pacientes
-                WHERE (Nombre LIKE ? OR Apellidos LIKE ?) AND IdCentro = ?
+                WHERE (Nombre LIKE %s OR Apellidos LIKE %s) AND IdCentro = %s
                 ORDER BY Apellidos, Nombre
             """
             params = (f'%{busqueda}%', f'%{busqueda}%', Config.ID_CENTRO)
@@ -290,7 +354,7 @@ def ejecutar_listar_citas(fecha_str):
                    p.NumPac, p.Nombre, p.Apellidos, p.TelMovil
             FROM DCitas c
             LEFT JOIN Pacientes p ON c.IdPac = p.IdPac
-            WHERE c.Fecha = ? AND c.IdCentro = ?
+            WHERE c.Fecha = %s AND c.IdCentro = %s
             ORDER BY c.Hora
         """
         
@@ -313,13 +377,13 @@ def ejecutar_crear_cita(id_pac, fecha_iso, hora_str, texto=""):
         fecha_gesden = GesdenDB.fecha_iso_a_gesden(fecha_iso)
         hora_gesden = GesdenDB.hora_string_a_gesden(hora_str)
         
-        sql_orden = "SELECT ISNULL(MAX(IdOrden), 0) + 1 AS siguiente FROM DCitas WHERE Fecha = ?"
+        sql_orden = "SELECT ISNULL(MAX(IdOrden), 0) + 1 AS siguiente FROM DCitas WHERE Fecha = %s"
         resultado = GesdenDB.ejecutar_query(sql_orden, (fecha_gesden,))
         id_orden = resultado[0]['siguiente'] if resultado else 1
         
         sql = """
             INSERT INTO DCitas (IdPac, Fecha, Hora, Duracion, Texto, IdOrden, IdCentro)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         id_cita = GesdenDB.ejecutar_insert(sql, (
@@ -365,7 +429,7 @@ def estado():
     """Estado del sistema - Health check extendido"""
     try:
         # Verificar conexión BD
-        conn = pyodbc.connect(Config.get_connection_string(), timeout=3)
+        conn = Config.get_db_connection()
         conn.close()
         bd_status = "conectada"
     except:
@@ -415,7 +479,7 @@ def buscar_pacientes():
             sql = """
                 SELECT TOP 20 IdPac, NumPac, Nombre, Apellidos, TelMovil, Email, FecNacim
                 FROM Pacientes
-                WHERE NumPac = ? AND IdCentro = ?
+                WHERE NumPac = %s AND IdCentro = %s
             """
             params = (int(busqueda), Config.ID_CENTRO)
         else:
@@ -423,7 +487,7 @@ def buscar_pacientes():
             sql = """
                 SELECT TOP 20 IdPac, NumPac, Nombre, Apellidos, TelMovil, Email, FecNacim
                 FROM Pacientes
-                WHERE (Nombre LIKE ? OR Apellidos LIKE ?) AND IdCentro = ?
+                WHERE (Nombre LIKE %s OR Apellidos LIKE %s) AND IdCentro = %s
                 ORDER BY Apellidos, Nombre
             """
             params = (f'%{busqueda}%', f'%{busqueda}%', Config.ID_CENTRO)
@@ -478,7 +542,7 @@ def listar_citas():
                    p.NumPac, p.Nombre, p.Apellidos, p.TelMovil
             FROM DCitas c
             LEFT JOIN Pacientes p ON c.IdPac = p.IdPac
-            WHERE c.Fecha = ?
+            WHERE c.Fecha = %s
             ORDER BY c.Hora
         """
         
@@ -522,14 +586,14 @@ def crear_cita():
         hora_gesden = GesdenDB.hora_string_a_gesden(hora_str)
         
         # Obtener siguiente IdOrden para esa fecha
-        sql_orden = "SELECT ISNULL(MAX(IdOrden), 0) + 1 FROM DCitas WHERE Fecha = ?"
+        sql_orden = "SELECT ISNULL(MAX(IdOrden), 0) + 1 FROM DCitas WHERE Fecha = %s"
         resultado = GesdenDB.ejecutar_query(sql_orden, (fecha_gesden,))
         id_orden = resultado[0][''] if resultado else 1
         
         # Insertar cita
         sql = """
             INSERT INTO DCitas (IdPac, Fecha, Hora, Duracion, Texto, IdOrden, IdCentro)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         id_cita = GesdenDB.ejecutar_insert(sql, (
@@ -626,7 +690,7 @@ if __name__ == '__main__':
     print()
     print("🗄️  Base de datos: LOCAL (SQL Server)")
     print("🌐 Acceso remoto: Vía Ngrok")
-    print("🤖 IA: Google Gemini 2.0 Flash (GRATIS)")
+    print("🤖 IA: Ollama (Llama 3.2) - 100% LOCAL & RÁPIDO")
     print()
     print("📍 Servidor: http://localhost:5000")
     print()

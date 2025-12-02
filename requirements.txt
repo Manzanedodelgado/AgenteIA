@@ -1,4 +1,6 @@
 flask==3.0.0
 flask-cors==4.0.0
-pyodbc==5.0.1
-anthropic==0.39.0
+pymssql
+langchain
+langchain-ollama
+langchain-community
